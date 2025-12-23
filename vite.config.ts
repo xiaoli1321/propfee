@@ -16,17 +16,21 @@ export default defineConfig(({ mode }) => {
         VitePWA({
           registerType: 'autoUpdate',
           injectRegister: 'auto',
+          workbox: {
+            globPatterns: ['**/*.{js,css,html,ico,png,svg}']
+          },
           includeAssets: ['favicon.svg'],
           manifest: {
-            name: 'PropFee 物业收费可视化系统',
-            short_name: 'PropFee',
-            description: '物业收费实时可视化与AI分析系统',
-            theme_color: '#ffffff',
+            name: '物业收费实时可视化系统',
+            short_name: '物业收费',
+            description: '实时查看物业费收缴进度与AI分析建议',
+            theme_color: '#6366f1',
             icons: [
               {
                 src: 'favicon.svg',
                 sizes: 'any',
-                type: 'image/svg+xml'
+                type: 'image/svg+xml',
+                purpose: 'any'
               }
             ]
           }
