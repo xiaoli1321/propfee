@@ -29,7 +29,7 @@ export const db = {
       name: s.name,
       deptId: s.dept_id,
       collectedAmount: Number(s.collected_amount),
-      target: Number(s.target_amount || 0)
+      target: Number(s.target_amount || 0) // 这里原本可能有误，确保字段名匹配
     }));
 
     const records: FeeEntryRecord[] = (feesData || []).map(f => ({

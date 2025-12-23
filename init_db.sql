@@ -13,6 +13,7 @@ CREATE TABLE staff (
   dept_id TEXT REFERENCES departments(id),
   name TEXT NOT NULL,
   collected_amount DECIMAL DEFAULT 0,
+  target_amount DECIMAL DEFAULT 0,
   role TEXT
 );
 
