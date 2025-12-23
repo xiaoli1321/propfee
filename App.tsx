@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { Department, Staff, FeeEntryRecord } from './types';
+import { Department, Staff, FeeEntryRecord, User } from './types';
 import { analyzeFeeData } from './services/aiService';
 import { db } from './services/supabaseService';
 
@@ -12,8 +12,10 @@ import Navbar from './components/Navbar';
 import Dashboard from './pages/Dashboard';
 import ChartsPage from './pages/ChartsPage';
 import ManagementPage from './pages/ManagementPage';
+import LoginPage from './pages/LoginPage';
 
 const App: React.FC = () => {
+  const [user, setUser] = useState<User | null>(db.getCurrentUser());
   const [departments, setDepartments] = useState<Department[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
   const [records, setRecords] = useState<FeeEntryRecord[]>([]);
@@ -23,6 +25,11 @@ const App: React.FC = () => {
 
   // 加载初始数据
   useEffect(() => {
+    if (!user) {
+      setIsLoading(false);
+      return;
+    }
+
     const loadData = async () => {
       try {
         const data = await db.getDashboardData();
@@ -36,7 +43,7 @@ const App: React.FC = () => {
       }
     };
     loadData();
-  }, []);
+  }, [user]);
 
   // Derived Statistics
   const totalAmount = useMemo(() => staff.reduce((acc, s) => acc + s.collectedAmount, 0), [staff]);
@@ -46,6 +53,7 @@ const App: React.FC = () => {
     return sorted[0]?.name || '无';
   }, [staff]);
 
+  // --- CRUD Handlers ---
   const handleAddFee = useCallback(async (staffId: string, amount: number) => {
     try {
       const newRecord = await db.addFeeRecord({ staffId, amount });
@@ -68,12 +76,52 @@ const App: React.FC = () => {
     }
   }, []);
 
+  const handleUpdateDept = useCallback(async (id: string, updates: Partial<Department>) => {
+    try {
+      const updated = await db.updateDept(id, updates);
+      setDepartments(prev => prev.map(d => d.id === id ? { ...d, ...updated } : d));
+    } catch (error) {
+      console.error('Failed to update dept:', error);
+    }
+  }, []);
+
+  const handleDeleteDept = useCallback(async (id: string) => {
+    if (!window.confirm('确定要删除该部门吗？所属人员将失去部门关联。')) return;
+    try {
+      await db.deleteDept(id);
+      setDepartments(prev => prev.filter(d => d.id !== id));
+      setStaff(prev => prev.map(s => s.deptId === id ? { ...s, deptId: '' } : s));
+    } catch (error) {
+      console.error('Failed to delete dept:', error);
+    }
+  }, []);
+
   const handleRegisterStaff = useCallback(async (name: string, deptId: string, target: number) => {
     try {
       const newStaff = await db.registerStaff(name, deptId, target);
       setStaff(prev => [...prev, newStaff]);
     } catch (error) {
       console.error('Failed to register staff:', error);
+    }
+  }, []);
+
+  const handleUpdateStaff = useCallback(async (id: string, updates: Partial<Staff>) => {
+    try {
+      const updated = await db.updateStaff(id, updates);
+      setStaff(prev => prev.map(s => s.id === id ? { ...s, ...updated } : s));
+    } catch (error) {
+      console.error('Failed to update staff:', error);
+    }
+  }, []);
+
+  const handleDeleteStaff = useCallback(async (id: string) => {
+    if (!window.confirm('确定要注销该人员吗？其收费记录将同步删除。')) return;
+    try {
+      await db.deleteStaff(id);
+      setStaff(prev => prev.filter(s => s.id !== id));
+      setRecords(prev => prev.filter(r => r.staffId !== id));
+    } catch (error) {
+      console.error('Failed to delete staff:', error);
     }
   }, []);
 
@@ -87,10 +135,19 @@ const App: React.FC = () => {
 
   // Initial AI call when data is ready
   useEffect(() => {
-    if (!isLoading && staff.length > 0) {
+    if (!isLoading && staff.length > 0 && user) {
       refreshAI();
     }
-  }, [isLoading, staff.length, refreshAI]);
+  }, [isLoading, staff.length, refreshAI, user]);
+
+  const handleLogin = (loggedUser: User) => {
+    setUser(loggedUser);
+  };
+
+  const handleLogout = () => {
+    db.logout();
+    setUser(null);
+  };
 
   if (isLoading) {
     return (
@@ -103,10 +160,14 @@ const App: React.FC = () => {
     );
   }
 
+  if (!user) {
+    return <LoginPage onLogin={handleLogin} />;
+  }
+
   return (
     <Router>
       <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
-        <Navbar />
+        <Navbar user={user} onLogout={handleLogout} />
         
         <main className="max-w-7xl mx-auto px-4 py-8">
           <Routes>
@@ -143,7 +204,11 @@ const App: React.FC = () => {
                   staff={staff}
                   onAddFee={handleAddFee}
                   onRegisterDept={handleRegisterDept}
+                  onUpdateDept={handleUpdateDept}
+                  onDeleteDept={handleDeleteDept}
                   onRegisterStaff={handleRegisterStaff}
+                  onUpdateStaff={handleUpdateStaff}
+                  onDeleteStaff={handleDeleteStaff}
                 />
               } 
             />

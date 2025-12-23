@@ -1,9 +1,15 @@
 
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, BarChart3, Settings, PlusCircle } from 'lucide-react';
+import { LayoutDashboard, BarChart3, PlusCircle, LogOut, User as UserIcon } from 'lucide-react';
+import { User } from '../types';
 
-const Navbar: React.FC = () => {
+interface NavbarProps {
+  user: User | null;
+  onLogout: () => void;
+}
+
+const Navbar: React.FC<NavbarProps> = ({ user, onLogout }) => {
   const location = useLocation();
 
   const navItems = [
@@ -46,6 +52,23 @@ const Navbar: React.FC = () => {
                 </Link>
               );
             })}
+
+            {/* User Info & Logout */}
+            {user && (
+              <div className="flex items-center gap-2 ml-2 pl-2 border-l border-slate-100">
+                <div className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-50 text-slate-600">
+                  <UserIcon className="w-4 h-4" />
+                  <span className="text-xs font-bold">{user.displayName}</span>
+                </div>
+                <button 
+                  onClick={onLogout}
+                  className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                  title="退出登录"
+                >
+                  <LogOut className="w-5 h-5" />
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

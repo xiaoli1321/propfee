@@ -1,4 +1,11 @@
 
+export interface User {
+  id: string;
+  username: string;
+  displayName: string;
+  role: 'admin' | 'staff';
+}
+
 export interface Staff {
   id: string;
   name: string;
@@ -11,6 +18,7 @@ export interface Department {
   id: string;
   name: string;
   color: string;
+  targetAmount?: number;
 }
 
 export interface FeeEntryRecord {

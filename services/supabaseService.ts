@@ -1,6 +1,6 @@
 
 import { createClient } from '@supabase/supabase-js';
-import { Department, Staff, FeeEntryRecord } from '../types';
+import { Department, Staff, FeeEntryRecord, User } from '../types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -12,7 +12,39 @@ if (!supabaseUrl || !supabaseAnonKey) {
 export const supabase = createClient(supabaseUrl || 'https://placeholder.supabase.co', supabaseAnonKey || 'placeholder');
 
 export const db = {
-  // 获取所有数据并转换为前端格式
+  // --- 用户相关 ---
+  async login(username: string, password: string): Promise<User | null> {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('username', username)
+      .eq('password', password)
+      .single();
+    
+    if (error || !data) return null;
+    
+    const user: User = {
+      id: data.id,
+      username: data.username,
+      displayName: data.display_name,
+      role: data.role as 'admin' | 'staff'
+    };
+    
+    // 存入本地存储
+    localStorage.setItem('propfee_user', JSON.stringify(user));
+    return user;
+  },
+
+  getCurrentUser(): User | null {
+    const saved = localStorage.getItem('propfee_user');
+    return saved ? JSON.parse(saved) : null;
+  },
+
+  logout() {
+    localStorage.removeItem('propfee_user');
+  },
+
+  // --- 基础数据获取 ---
   async getDashboardData() {
     const { data: deptsData } = await supabase.from('departments').select('*');
     const { data: staffData } = await supabase.from('staff').select('*');
@@ -21,7 +53,8 @@ export const db = {
     const departments: Department[] = (deptsData || []).map(d => ({
       id: d.id,
       name: d.name,
-      color: d.color
+      color: d.color,
+      targetAmount: Number(d.target_amount || 0)
     }));
 
     const staff: Staff[] = (staffData || []).map(s => ({
@@ -29,7 +62,7 @@ export const db = {
       name: s.name,
       deptId: s.dept_id,
       collectedAmount: Number(s.collected_amount),
-      target: Number(s.target_amount || 0) // 这里原本可能有误，确保字段名匹配
+      target: Number(s.target_amount || 0)
     }));
 
     const records: FeeEntryRecord[] = (feesData || []).map(f => ({
@@ -42,9 +75,8 @@ export const db = {
     return { departments, staff, records };
   },
 
-  // 保存一条新的收费记录
+  // --- 收费记录 ---
   async addFeeRecord(record: { staffId: string; amount: number }) {
-    // 1. 插入收费记录
     const { data, error } = await supabase
       .from('fees')
       .insert([{
@@ -57,7 +89,6 @@ export const db = {
     
     if (error) throw error;
     
-    // 2. 更新人员的累计金额
     const { data: staffMember, error: fetchError } = await supabase
       .from('staff')
       .select('collected_amount')
@@ -83,20 +114,44 @@ export const db = {
     };
   },
 
-  // 注册新部门
-  async registerDept(name: string, color: string) {
+  // --- 部门管理 ---
+  async registerDept(name: string, color: string, targetAmount: number = 0) {
     const id = `dept-${Date.now()}`;
     const { data, error } = await supabase
       .from('departments')
-      .insert([{ id, name, color }])
+      .insert([{ id, name, color, target_amount: targetAmount }])
       .select()
       .single();
     
     if (error) throw error;
-    return { id: data.id, name: data.name, color: data.color };
+    return { id: data.id, name: data.name, color: data.color, targetAmount: Number(data.target_amount) };
   },
 
-  // 注册新员工
+  async updateDept(id: string, updates: Partial<Department>) {
+    const { data, error } = await supabase
+      .from('departments')
+      .update({
+        name: updates.name,
+        color: updates.color,
+        target_amount: updates.targetAmount
+      })
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return { id: data.id, name: data.name, color: data.color, targetAmount: Number(data.target_amount) };
+  },
+
+  async deleteDept(id: string) {
+    const { error } = await supabase
+      .from('departments')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+  },
+
+  // --- 人员管理 ---
   async registerStaff(name: string, deptId: string, target: number) {
     const id = `s-${Date.now()}`;
     const { data, error } = await supabase
@@ -119,5 +174,35 @@ export const db = {
       collectedAmount: 0,
       target: Number(data.target_amount)
     };
+  },
+
+  async updateStaff(id: string, updates: Partial<Staff>) {
+    const { data, error } = await supabase
+      .from('staff')
+      .update({
+        name: updates.name,
+        dept_id: updates.deptId,
+        target_amount: updates.target
+      })
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return {
+      id: data.id,
+      name: data.name,
+      deptId: data.dept_id,
+      collectedAmount: Number(data.collected_amount),
+      target: Number(data.target_amount)
+    };
+  },
+
+  async deleteStaff(id: string) {
+    const { error } = await supabase
+      .from('staff')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
   }
 };

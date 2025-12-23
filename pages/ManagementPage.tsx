@@ -10,7 +10,11 @@ interface ManagementPageProps {
   staff: Staff[];
   onAddFee: (staffId: string, amount: number) => Promise<void>;
   onRegisterDept: (name: string, color: string) => Promise<void>;
+  onUpdateDept: (id: string, updates: Partial<Department>) => Promise<void>;
+  onDeleteDept: (id: string) => Promise<void>;
   onRegisterStaff: (name: string, deptId: string, target: number) => Promise<void>;
+  onUpdateStaff: (id: string, updates: Partial<Staff>) => Promise<void>;
+  onDeleteStaff: (id: string) => Promise<void>;
 }
 
 const ManagementPage: React.FC<ManagementPageProps> = ({
@@ -18,7 +22,11 @@ const ManagementPage: React.FC<ManagementPageProps> = ({
   staff,
   onAddFee,
   onRegisterDept,
-  onRegisterStaff
+  onUpdateDept,
+  onDeleteDept,
+  onRegisterStaff,
+  onUpdateStaff,
+  onDeleteStaff
 }) => {
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -53,18 +61,18 @@ const ManagementPage: React.FC<ManagementPageProps> = ({
           </div>
           <ManagementPanel 
             departments={departments} 
+            staff={staff}
             onRegisterDept={onRegisterDept} 
-            onRegisterStaff={handleRegisterStaffWrapper} 
+            onUpdateDept={onUpdateDept}
+            onDeleteDept={onDeleteDept}
+            onRegisterStaff={onRegisterStaff} 
+            onUpdateStaff={onUpdateStaff}
+            onDeleteStaff={onDeleteStaff}
           />
         </div>
       </div>
     </div>
   );
-
-  // Helper to handle the async mismatch if needed, but the types should match
-  async function handleRegisterStaffWrapper(name: string, deptId: string, target: number) {
-    await onRegisterStaff(name, deptId, target);
-  }
 };
 
 export default ManagementPage;
