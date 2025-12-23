@@ -1,0 +1,5 @@
+{
+  "name": "PropFee - 物业收费实时可视化系统",
+  "description": "一个专为物业管理设计的收费统计与可视化看板，支持多部门、多人员层级的收费数据实时录入、占比分析及AI辅助运营决策。",
+  "requestFramePermissions": []
+}
