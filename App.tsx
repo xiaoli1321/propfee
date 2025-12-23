@@ -6,7 +6,7 @@ import { Charts } from './components/Charts';
 import { FeeEntry } from './components/FeeEntry';
 import { ManagementPanel } from './components/ManagementPanel';
 import { DepartmentHierarchy } from './components/DepartmentHierarchy';
-import { analyzeFeeData } from './services/geminiService';
+import { analyzeFeeData } from './services/aiService';
 import { db } from './services/supabaseService';
 
 const App: React.FC = () => {
