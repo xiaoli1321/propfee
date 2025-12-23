@@ -1,21 +1,39 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Department, Staff, FeeEntryRecord, DashboardData } from './types';
-import { INITIAL_DEPARTMENTS, INITIAL_STAFF } from './constants';
+import { Department, Staff, FeeEntryRecord } from './types';
 import { StatsCards } from './components/StatsCards';
 import { Charts } from './components/Charts';
 import { FeeEntry } from './components/FeeEntry';
 import { ManagementPanel } from './components/ManagementPanel';
 import { DepartmentHierarchy } from './components/DepartmentHierarchy';
 import { analyzeFeeData } from './services/geminiService';
+import { db } from './services/supabaseService';
 
 const App: React.FC = () => {
-  const [departments, setDepartments] = useState<Department[]>(INITIAL_DEPARTMENTS);
-  const [staff, setStaff] = useState<Staff[]>(INITIAL_STAFF);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [staff, setStaff] = useState<Staff[]>([]);
   const [records, setRecords] = useState<FeeEntryRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [aiInsight, setAiInsight] = useState<string>('正在分析收缴趋势...');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showManagement, setShowManagement] = useState(false);
+
+  // 加载初始数据
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const data = await db.getDashboardData();
+        setDepartments(data.departments);
+        setStaff(data.staff);
+        setRecords(data.records);
+      } catch (error) {
+        console.error('Failed to load data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadData();
+  }, []);
 
   // Derived Statistics
   const totalAmount = useMemo(() => staff.reduce((acc, s) => acc + s.collectedAmount, 0), [staff]);
@@ -25,48 +43,64 @@ const App: React.FC = () => {
     return sorted[0]?.name || '无';
   }, [staff]);
 
-  const handleAddFee = useCallback((staffId: string, amount: number) => {
-    setStaff(prev => prev.map(s => 
-      s.id === staffId ? { ...s, collectedAmount: s.collectedAmount + amount } : s
-    ));
-    setRecords(prev => [
-      { id: Math.random().toString(36).substr(2, 9), staffId, amount, timestamp: Date.now() },
-      ...prev
-    ]);
+  const handleAddFee = useCallback(async (staffId: string, amount: number) => {
+    try {
+      const newRecord = await db.addFeeRecord({ staffId, amount });
+      
+      // 更新本地状态
+      setStaff(prev => prev.map(s => 
+        s.id === staffId ? { ...s, collectedAmount: s.collectedAmount + amount } : s
+      ));
+      setRecords(prev => [newRecord, ...prev]);
+    } catch (error) {
+      console.error('Failed to add fee:', error);
+      alert('保存失败，请检查网络或配置');
+    }
   }, []);
 
-  const handleRegisterDept = useCallback((name: string, color: string) => {
-    const newDept: Department = {
-      id: `dept-${Date.now()}`,
-      name,
-      color
-    };
-    setDepartments(prev => [...prev, newDept]);
+  const handleRegisterDept = useCallback(async (name: string, color: string) => {
+    try {
+      const newDept = await db.registerDept(name, color);
+      setDepartments(prev => [...prev, newDept]);
+    } catch (error) {
+      console.error('Failed to register dept:', error);
+    }
   }, []);
 
-  const handleRegisterStaff = useCallback((name: string, deptId: string, target: number) => {
-    const newStaff: Staff = {
-      id: `s-${Date.now()}`,
-      name,
-      deptId,
-      collectedAmount: 0,
-      target
-    };
-    setStaff(prev => [...prev, newStaff]);
+  const handleRegisterStaff = useCallback(async (name: string, deptId: string, target: number) => {
+    try {
+      const newStaff = await db.registerStaff(name, deptId, target);
+      setStaff(prev => [...prev, newStaff]);
+    } catch (error) {
+      console.error('Failed to register staff:', error);
+    }
   }, []);
 
   const refreshAI = useCallback(async () => {
+    if (staff.length === 0) return;
     setIsAnalyzing(true);
     const result = await analyzeFeeData({ departments, staff, records });
     setAiInsight(result || '分析暂时不可用');
     setIsAnalyzing(false);
   }, [departments, staff, records]);
 
-  // Initial AI call
+  // Initial AI call when data is ready
   useEffect(() => {
-    refreshAI();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (!isLoading && staff.length > 0) {
+      refreshAI();
+    }
+  }, [isLoading, staff.length, refreshAI]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-slate-600 font-medium">正在加载实时数据...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 pb-12 font-sans">

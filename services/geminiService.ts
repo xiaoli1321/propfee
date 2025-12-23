@@ -2,9 +2,18 @@
 import { GoogleGenAI } from "@google/genai";
 import { DashboardData } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+
+if (!apiKey) {
+  console.warn("Gemini API Key is missing. AI features will be disabled.");
+}
+
+const ai = apiKey ? new GoogleGenAI(apiKey) : null;
 
 export async function analyzeFeeData(data: DashboardData) {
+  if (!ai) {
+    return "AI 功能未启用：请配置 API Key。";
+  }
   const summary = data.departments.map(d => {
     const deptStaff = data.staff.filter(s => s.deptId === d.id);
     const total = deptStaff.reduce((acc, s) => acc + s.collectedAmount, 0);
@@ -30,8 +39,11 @@ export async function analyzeFeeData(data: DashboardData) {
       contents: prompt,
     });
     return response.text;
-  } catch (error) {
+  } catch (error: any) {
     console.error("Gemini analysis failed", error);
+    if (error?.message?.includes('429') || error?.status === 'RESOURCE_EXHAUSTED') {
+      return "AI 建议暂时不可用：已达到免费额度上限（Quota Exceeded）。请稍后再试，或检查您的 Google AI Studio 账单设置。";
+    }
     return "暂时无法生成AI建议，请检查网络或配置。";
   }
 }
